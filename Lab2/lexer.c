@@ -2,7 +2,8 @@
 #include <string.h>
 #include <ctype.h>
 
-#define MAX_LEN 100
+#define MAX_LEN 200
+#define LEFT_SPACE 20
 
 const char *keywords[] = {"int", "float", "if", "else", "while", "return", "for", "break", "continue", "char", "double", "void"};
 
@@ -16,23 +17,26 @@ int isKeyword(char *word)
     return 0;
 }
 
-int isSpecialSymbol(char c)
-{
-    return c == '(' || c == ')' || c == '{' || c == '}' || c == ';' || c == ',';
-}
+int isSpecialSymbol(char c) { return c == '(' || c == ')' || c == '{' || c == '}' || c == ';' || c == ','; }
 
-int isOperator(char c)
-{
-    return c == '+' || c == '-' || c == '*' || c == '/' || c == '=' || c == '<' || c == '>' || c == '!';
-}
+int isOperator(char c) { return c == '+' || c == '-' || c == '*' || c == '/' || c == '=' || c == '<' || c == '>' || c == '!'; }
 
-void printToken(char *type, char *value)
+void printToken(char *type, char *value) { printf("%*s : %s\n", LEFT_SPACE, type, value); }
+
+void printError(char *message, char *value, int line)
 {
-    printf("%20s : %s\n", type, value);
+    // char typeFormatted[100];
+    // sprintf(typeFormatted, "\033[1;31mError (line %d):\033[0m Invalid token :", line);
+    // printf("\033[1;31mError:\033[0m %s '%s'\n", message, value);
+
+    printf("\033[1;31mError in (line %d):\033[0m\n", line);
+    printf("\033[1;31m%*s :\033[0m %s\n", LEFT_SPACE, message, value);
 }
 
 int main()
 {
+    // printf("\033[1;31mError:\033[0m Invalid token '123_new'\n");
+
     FILE *file = fopen("test_code.c", "r");
     if (!file)
     {
@@ -42,27 +46,14 @@ int main()
 
     char ch, buffer[MAX_LEN];
     int i = 0;
-    int inSingleLineComment = 0, inMultiLineComment = 0;
+    int line = 1;
 
     while ((ch = fgetc(file)) != EOF)
     {
-        if (inSingleLineComment)
-        {
-            if (ch == '\n')
-                inSingleLineComment = 0;
+        if (isspace(ch))
             continue;
-        }
 
-        if (inMultiLineComment)
-        {
-            if (ch == '*' && (ch = fgetc(file)) == '/')
-            {
-                inMultiLineComment = 0;
-            }
-            continue;
-        }
-
-        // Handle preprocessor line: #include <stdio.h>
+        // Handle preprocessor line
         if (ch == '#')
         {
             i = 0;
@@ -73,10 +64,10 @@ int main()
             }
             buffer[i] = '\0';
             printToken("Preprocessor", buffer);
+            line++;
             continue;
         }
 
-        // Handle comments
         // Handle comments
         if (ch == '/')
         {
@@ -93,6 +84,7 @@ int main()
                 }
                 buffer[i] = '\0';
                 printToken("Single-line Comment", buffer);
+                line++;
                 continue;
             }
             else if (next == '*')
@@ -105,7 +97,22 @@ int main()
 
                 while ((ch = fgetc(file)) != EOF)
                 {
-                    buffer[i++] = ch;
+                    if (ch == '\n')
+                    {
+                        line++;
+                        // buffer[i++] = '\\';
+                        // buffer[i++] = 'n';
+                        buffer[i++] = '\n';
+                        for (int j = 0; j < LEFT_SPACE + 1; j++)
+                        {
+                            buffer[i++] = ' ';
+                        }
+                        buffer[i++] = ':';
+                    }
+                    else
+                    {
+                        buffer[i++] = ch;
+                    }
 
                     if (prev == '*' && ch == '/')
                         break;
@@ -121,7 +128,6 @@ int main()
                         break;
                     }
                 }
-
                 buffer[i] = '\0';
                 printToken("Multi-line Comment", buffer);
                 continue;
@@ -137,9 +143,6 @@ int main()
             }
         }
 
-        if (isspace(ch))
-            continue;
-
         // Handle string literals
         if (ch == '"')
         {
@@ -148,6 +151,8 @@ int main()
             while ((ch = fgetc(file)) != EOF && ch != '"')
             {
                 buffer[i++] = ch;
+                if (ch == '\n')
+                    line++;
             }
             buffer[i++] = '"'; // add closing quote
             buffer[i] = '\0';
@@ -155,48 +160,67 @@ int main()
             continue;
         }
 
-        // Identifiers or keywords
-        if (isalpha(ch) || ch == '_')
+        // Unified block for identifiers, keywords, and numbers
+        if (isalpha(ch) || ch == '_' || isdigit(ch))
         {
             i = 0;
             buffer[i++] = ch;
-            while ((ch = fgetc(file)) != EOF && (isalnum(ch) || ch == '_'))
-            {
-                buffer[i++] = ch;
-            }
-            buffer[i] = '\0';
-            ungetc(ch, file);
-            if (isKeyword(buffer))
-                printToken("Keyword", buffer);
-            else
-                printToken("Identifier", buffer);
-        }
 
-        // Numbers (integers and floats)
-        else if (isdigit(ch))
-        {
-            i = 0;
+            int isFirstDigit = isdigit(ch);
             int hasDot = 0;
-            buffer[i++] = ch;
-            while ((ch = fgetc(file)) != EOF && (isdigit(ch) || ch == '.'))
+            int hasAlpha = isalpha(ch);
+            int isValid = 1;
+
+            while ((ch = fgetc(file)) != EOF && (isalnum(ch) || ch == '_' || ch == '.'))
             {
                 if (ch == '.')
                 {
-                    if (hasDot)
-                        break;
+                    if (hasDot || !isFirstDigit) // already has a dot OR dot without starting as number
+                    {
+                        isValid = 0;
+                    }
                     hasDot = 1;
+                }
+                else if (isalpha(ch) || ch == '_')
+                {
+                    hasAlpha = 1;
+                    if (isFirstDigit) // starts as number but has alpha → invalid
+                        isValid = 0;
                 }
                 buffer[i++] = ch;
             }
+
             buffer[i] = '\0';
             ungetc(ch, file);
-            if (hasDot)
-                printToken("Float", buffer);
+
+            if (!isValid)
+            {
+                printError("Invalid token", buffer, line);
+            }
+            else if (isKeyword(buffer))
+            {
+                printToken("Keyword", buffer);
+            }
+            else if (isdigit(buffer[0]))
+            {
+                if (hasDot)
+                    printToken("Float", buffer);
+                else
+                    printToken("Integer", buffer);
+            }
+            else if (isalpha(buffer[0]) || buffer[0] == '_')
+            {
+                printToken("Identifier", buffer);
+            }
             else
-                printToken("Integer", buffer);
+            {
+                printError("Invalid token", buffer, line);
+            }
+
+            continue;
         }
 
-        // Two-character operators (optional extension)
+        // Two-character operators
         else if (isOperator(ch))
         {
             char next = fgetc(file);
@@ -217,6 +241,10 @@ int main()
         // Special symbols
         else if (isSpecialSymbol(ch))
         {
+            // if (ch == '{' || ch == '}' || ch == ')' || ch == ';') line++;
+            if (ch == '{' || ch == '}' || ch == ')' || ch == ';')
+                line++;
+
             buffer[0] = ch;
             buffer[1] = '\0';
             printToken("Special Symbol", buffer);
@@ -225,6 +253,7 @@ int main()
         // Ignore newline
         else if (ch == '\n')
         {
+            line++;
             continue;
         }
 
@@ -233,7 +262,8 @@ int main()
         {
             buffer[0] = ch;
             buffer[1] = '\0';
-            printf("Error: Invalid token '%s'\n", buffer);
+            line++;
+            printError("Invalid token", buffer, line);
         }
     }
 
