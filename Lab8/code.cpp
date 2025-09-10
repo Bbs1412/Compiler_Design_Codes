@@ -207,7 +207,7 @@ int main()
     // ------------------------------------------------------------------------------
     // 5. Print canonical collection
     // ------------------------------------------------------------------------------
-    cout << "=== Canonical Collection of LR(0) Items ===\n\n";
+    cout << "---------- [#] Canonical Collection of LR(0) Items [#] ----------\n\n";
     for (size_t i = 0; i < C.size(); ++i)
     {
         cout << "State I" << i << ":\n";
@@ -239,7 +239,7 @@ int main()
         }
     }
 
-    cout << "=== DFA (state transitions) ===\n\n";
+    cout << "---------- [#] DFA (state transitions) [#] ----------\n\n";
     for (auto &p : transitions)
     {
         int s = p.first;
@@ -325,7 +325,7 @@ int main()
     // 8. Print the LR(0) Parsing Table
     // ------------------------------------------------------------------------------
 
-    cout << "=== LR(0) Parsing Table ===\n\n";
+    cout << "---------- [#] LR(0) Parsing Table [#] ----------\n\n";
 
     // Header
     vector<string> termHdr = {"c", "d", "$"};
@@ -373,7 +373,7 @@ int main()
     }
     inputTokens.push_back("$");
 
-    cout << "=== Parsing Trace (input = " << inputRaw << ") ===\n\n";
+    cout << "---------- [#] Parsing Trace (input = " << inputRaw << ") [#] ----------\n\n";
     // Parser stack: state stack (ints) and symbol stack (strings) for readability
     vector<int> stateStack;
     vector<string> symStack;
@@ -387,36 +387,45 @@ int main()
     auto printStep = [&](const string &actionDesc)
     {
         // Print step number, stack content (states and symbols), input buffer, action
-        cout << setw(3) << step << " | ";
-        // Show stack as alternating symbols and states for clarity
-        // We'll print like: $ 0 C 3 ... but prefer "states: [0 3 ...], symbols: [$ C ...]"
-        cout << "States: [";
+        cout << setw(3) << left << step << " | ";
+        // Format states
+        stringstream ssStates;
+        ssStates << "[";
         for (size_t i = 0; i < stateStack.size(); ++i)
         {
             if (i)
-                cout << " ";
-            cout << stateStack[i];
+                ssStates << " ";
+            ssStates << stateStack[i];
         }
-        cout << "] ";
-        cout << " | Syms: [";
+        ssStates << "]";
+        cout << setw(18) << left << ssStates.str() << " | ";
+
+        // Format symbols
+        stringstream ssSyms;
+        ssSyms << "[";
         for (size_t i = 0; i < symStack.size(); ++i)
         {
             if (i)
-                cout << " ";
-            cout << symStack[i];
+                ssSyms << " ";
+            ssSyms << symStack[i];
         }
-        cout << "] ";
-        cout << " | Input: ";
-        // print remaining input buffer
+        ssSyms << "]";
+        cout << setw(13) << left << ssSyms.str() << " | ";
+
+        // Format input
+        stringstream ssInput;
         for (size_t k = ip; k < inputTokens.size(); ++k)
         {
-            cout << inputTokens[k];
+            ssInput << inputTokens[k];
         }
-        cout << " | Action: " << actionDesc << "\n";
+        cout << setw(7) << left << ssInput.str() << " | ";
+
+        // Action
+        cout << left << actionDesc << "\n";
     };
 
-    cout << "Step | Stack (states) | Symbols | Input | Action\n";
-    cout << "---------------------------------------------------------------\n";
+    cout << "Step| Stack (states)     | Symbols       | Input   | Action\n";
+    cout << "------------------------------------------------------------------------------------------\n";
 
     while (true)
     {
@@ -515,6 +524,6 @@ int main()
         cout << "\n";
     }
 
-    cout << "\n(End of output)\n";
+    cout << "\n(DONE)\n";
     return 0;
 }
